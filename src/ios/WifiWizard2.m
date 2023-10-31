@@ -232,35 +232,18 @@
 }
 
 - (void)getConnectedSSID:(CDVInvokedUrlCommand*)command {
-    if (@available(iOS 14.0, *)) {
-	__block NSString *ssid = nil;
-	__block CDVPluginResult *pluginResult = nil;
-        [NEHotspotNetwork fetchCurrentWithCompletionHandler:^(NEHotspotNetwork * _Nullable currentNetwork) {
-            ssid = [currentNetwork SSID];
-
-            NSLog(@"%@", currentNetwork);
-            if (ssid && [ssid length]) {
-                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:ssid];
-            } else {
-                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Not available"];
-            }
-            [self.commandDelegate sendPluginResult:pluginResult
-                                        callbackId:command.callbackId];
-        }];
-    } else {
-        CDVPluginResult *pluginResult = nil;
-        
-        NSString *ssid = [self getWifiSsid]; //@"SSID"
-        
-        if (ssid && [ssid length]) {
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:ssid];
-        } else {
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Not available"];
-        }
-        
-        [self.commandDelegate sendPluginResult:pluginResult
+	CDVPluginResult *pluginResult = nil;
+	
+	NSString *ssid = [self getWifiSsid]; //@"SSID"
+	
+	if (ssid && [ssid length]) {
+	    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:ssid];
+	} else {
+	    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Not available"];
+	}
+	
+	[self.commandDelegate sendPluginResult:pluginResult
                                     callbackId:command.callbackId];
-    }
 }
 
 - (void)isWifiEnabled:(CDVInvokedUrlCommand*)command {
