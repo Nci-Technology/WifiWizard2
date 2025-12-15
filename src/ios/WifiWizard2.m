@@ -217,16 +217,29 @@
 }
 
 - (void)getConnectedSSID:(CDVInvokedUrlCommand*)command {
+    [self getWifiSsidWithCompletion:^(NSString *ssid) {
+        CDVPluginResult *pluginResult = nil;
+        if (ssid && [ssid length]) {
+            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:ssid];
+        } else {
+            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Not available"];
+        }
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }];
+}
+
+- (void)getConnectedBSSID:(CDVInvokedUrlCommand*)command {
     CDVPluginResult *pluginResult = nil;
-
-    NSString *ssid = [self getWifiSsid]; //@"SSID"
-
-    if (ssid && [ssid length]) {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:ssid];
+    NSDictionary *r = [self fetchSSIDInfo];
+    
+    NSString *bssid = [r objectForKey:(id)kCNNetworkInfoKeyBSSID]; //@"SSID"
+    
+    if (bssid && [bssid length]) {
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:bssid];
     } else {
         pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Not available"];
     }
-
+    
     [self.commandDelegate sendPluginResult:pluginResult
                                 callbackId:command.callbackId];
 }
@@ -385,39 +398,59 @@
                                 callbackId:command.callbackId];
 }
 
-- (NSString*) getWifiSsid {
+- (void) getWifiSsidWithCompletion:(void (^)(NSString *))completion {
     if (@available(iOS 13.0, *)) {
-        if ([CLLocationManager authorizationStatus] == kCLAuthorizationStatusDenied) {
+        CLAuthorizationStatus status = [CLLocationManager authorizationStatus];
+        if (status == kCLAuthorizationStatusDenied) {
             NSLog(@"User has explicitly denied authorization for this application, or location services are disabled in Settings.");
-            //[[UIApplication sharedApplication] openURL:[NSURL URLWithString:UIApplicationOpenSettingsURLString]];
-            return nil;
+            completion(nil);
+            return;
         }
-        CLLocationManager* cllocation = [[CLLocationManager alloc] init];
-        if(![CLLocationManager locationServicesEnabled] || [CLLocationManager authorizationStatus] == kCLAuthorizationStatusNotDetermined){
-            [cllocation requestWhenInUseAuthorization];
-            usleep(500);
-            return [self getWifiSsid];
-        }
-    }
-    NSString *wifiName = nil;
-    CFArrayRef wifiInterfaces = CNCopySupportedInterfaces();
-    if (!wifiInterfaces) {
-        return nil;
-    }
-    NSArray *interfaces = (__bridge NSArray *)wifiInterfaces;
-    for (NSString *interfaceName in interfaces) {
-        CFDictionaryRef dictRef = CNCopyCurrentNetworkInfo((__bridge CFStringRef)(interfaceName));
         
-        if (dictRef) {
-            NSDictionary *networkInfo = (__bridge NSDictionary *)dictRef;
-            NSLog(@"network info -> %@", networkInfo);
-            wifiName = [networkInfo objectForKey:(__bridge NSString *)kCNNetworkInfoKeySSID];
-            CFRelease(dictRef);
+        if(![CLLocationManager locationServicesEnabled] || status == kCLAuthorizationStatusNotDetermined){
+            static CLLocationManager* cllocation;
+            if (!cllocation) {
+                cllocation = [[CLLocationManager alloc] init];
+            }
+            [cllocation requestWhenInUseAuthorization];
+            
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [self getWifiSsidWithCompletion:completion];
+            });
+            return;
         }
     }
     
-    CFRelease(wifiInterfaces);
-    return wifiName;
+    if (@available(iOS 14.0, *)) {
+        [NEHotspotNetwork fetchCurrentWithCompletionHandler:^(NEHotspotNetwork * _Nullable currentNetwork) {
+            if (currentNetwork) {
+                completion(currentNetwork.SSID);
+            } else {
+                completion(nil);
+            }
+        }];
+    } else {
+        NSString *wifiName = nil;
+        CFArrayRef wifiInterfaces = CNCopySupportedInterfaces();
+        if (!wifiInterfaces) {
+            completion(nil);
+            return;
+        }
+        NSArray *interfaces = (__bridge NSArray *)wifiInterfaces;
+        for (NSString *interfaceName in interfaces) {
+            CFDictionaryRef dictRef = CNCopyCurrentNetworkInfo((__bridge CFStringRef)(interfaceName));
+            
+            if (dictRef) {
+                NSDictionary *networkInfo = (__bridge NSDictionary *)dictRef;
+                NSLog(@"network info -> %@", networkInfo);
+                wifiName = [networkInfo objectForKey:@"SSID"];
+                CFRelease(dictRef);
+            }
+        }
+        
+        CFRelease(wifiInterfaces);
+        completion(wifiName);
+    }
 }
 
 
