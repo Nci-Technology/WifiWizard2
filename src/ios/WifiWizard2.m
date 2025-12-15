@@ -244,22 +244,6 @@
                                 callbackId:command.callbackId];
 }
 
-- (void)getConnectedBSSID:(CDVInvokedUrlCommand*)command {
-    CDVPluginResult *pluginResult = nil;
-    NSDictionary *r = [self fetchSSIDInfo];
-    
-    NSString *bssid = [r objectForKey:(id)kCNNetworkInfoKeyBSSID]; //@"SSID"
-    
-    if (bssid && [bssid length]) {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:bssid];
-    } else {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Not available"];
-    }
-    
-    [self.commandDelegate sendPluginResult:pluginResult
-                                callbackId:command.callbackId];
-}
-
 - (void)isWifiEnabled:(CDVInvokedUrlCommand*)command {
     CDVPluginResult *pluginResult = nil;
     NSString *isWifiOn = [self isWiFiEnabled] ? @"1" : @"0";
